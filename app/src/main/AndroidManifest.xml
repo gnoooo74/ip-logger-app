@@ -7,7 +7,9 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29"/>
 
-    <application android:label="IpLogger">
+    <application 
+    android:label="IpLogger"
+    android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         <activity android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
