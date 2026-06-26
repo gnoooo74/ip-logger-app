@@ -34,6 +34,9 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
     }
 
     companion object {
+        private var lastLogTime = 0L
+        private var lastLogIp = ""
+
         private const val SECRET_KEY = "kg7226kg050309"
 
         fun generateHash(time: String, network: String, ip: String): String {
@@ -46,9 +49,17 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
         fun logIpNow(context: Context) {
             try {
                 val ip = URL("https://api.ipify.org").readText()
-                val now = Date()
-                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now)
-                val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(now)
+                val now = System.currentTimeMillis()
+
+                // 10초 이내 같은 IP면 중복 기록 안 함
+                if (ip == lastLogIp && now - lastLogTime < 10_000) return
+
+                lastLogTime = now
+                lastLogIp = ip
+
+                val date = Date(now)
+                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
+                val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(date)
                 val networkType = getNetworkType(context)
                 val hash = generateHash(timeStr, networkType, ip)
 
@@ -60,7 +71,7 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
                 dir.mkdirs()
                 File(dir, "$dateStr.txt").appendText("$timeStr [$networkType] - $ip | $hash\n")
             } catch (e: Exception) {
-                // 실패 시 무시, 다음 주기에 재시도
+                // 실패 시 무시
             }
         }
 
