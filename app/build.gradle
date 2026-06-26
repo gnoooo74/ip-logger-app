@@ -3,6 +3,7 @@ plugins {
     id 'kotlin-android'
 }
 android {
+    namespace 'com.iplogger'
     compileSdk 34
     defaultConfig {
         applicationId "com.iplogger"
