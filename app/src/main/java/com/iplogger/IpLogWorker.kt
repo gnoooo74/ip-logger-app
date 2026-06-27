@@ -179,9 +179,9 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
                 val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(date)
                 val networkType = getNetworkType(context)
                 val cellInfo = getCellInfo(context)
-                if (cellInfo.contains("인접:0개")) {
-                    triggerAlert(context)
-                }
+                //if (cellInfo.contains("인접:0개")) {
+                //    triggerAlert(context)
+                //}
                 val logData = "$timeStr[$networkType]$ip$cellInfo"
                 val hash = generateHash(logData)
 
