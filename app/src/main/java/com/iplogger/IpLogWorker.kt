@@ -3,10 +3,14 @@ package com.iplogger
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.telephony.TelephonyManager
+import android.os.Build
+import android.telephony.*
 import androidx.work.*
 import java.io.File
 import java.net.URL
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
@@ -36,42 +40,51 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
     companion object {
         private var lastLogTime = 0L
         private var lastLogIp = ""
-
         private const val SECRET_KEY = "kg7226kg050309"
 
-        fun generateHash(time: String, network: String, ip: String): String {
-            val raw = "$time$network$ip$SECRET_KEY"
+        fun generateHash(data: String): String {
+            val raw = "$data$SECRET_KEY"
             val digest = MessageDigest.getInstance("SHA-256")
             val hashBytes = digest.digest(raw.toByteArray())
             return hashBytes.joinToString("") { "%02x".format(it) }.take(16)
         }
 
-        fun logIpNow(context: Context) {
-            try {
-                val ip = URL("https://api.ipify.org").readText()
-                val now = System.currentTimeMillis()
+        fun getCellInfo(context: Context): String {
+            return try {
+                val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+                val cellInfoList = tm.allCellInfo ?: return "셀정보없음"
 
-                // 10초 이내 같은 IP면 중복 기록 안 함
-                if (ip == lastLogIp && now - lastLogTime < 10_000) return
+                val sb = StringBuilder()
+                var neighborCount = 0
 
-                lastLogTime = now
-                lastLogIp = ip
+                for (cellInfo in cellInfoList) {
+                    when {
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                        cellInfo is CellInfoNr && cellInfo.isRegistered -> {
+                            val id = cellInfo.cellIdentity as CellIdentityNr
+                            val sig = cellInfo.cellSignalStrength as CellSignalStrengthNr
+                            sb.append("CellID:${id.nci} PCI:${id.pci} TAC:${id.tac} MNC:${id.mncString} RSRP:${sig.ssRsrp}dBm")
+                        }
+                        cellInfo is CellInfoLte && cellInfo.isRegistered -> {
+                            val id = cellInfo.cellIdentity
+                            val sig = cellInfo.cellSignalStrength
+                            sb.append("CellID:${id.ci} PCI:${id.pci} LAC:${id.tac} MNC:${id.mncString} RSRP:${sig.rsrp}dBm")
+                        }
+                        cellInfo is CellInfoWcdma && cellInfo.isRegistered -> {
+                            val id = cellInfo.cellIdentity
+                            val sig = cellInfo.cellSignalStrength
+                            sb.append("CellID:${id.cid} LAC:${id.lac} MNC:${id.mncString} RSSI:${sig.dbm}dBm")
+                        }
+                        !cellInfo.isRegistered -> neighborCount++
+                    }
+                }
 
-                val date = Date(now)
-                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
-                val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(date)
-                val networkType = getNetworkType(context)
-                val hash = generateHash(timeStr, networkType, ip)
+                if (sb.isEmpty()) sb.append("셀정보없음")
+                sb.append(" 인접:${neighborCount}개")
+                sb.toString()
 
-                val dir = File(
-                    android.os.Environment.getExternalStoragePublicDirectory(
-                        android.os.Environment.DIRECTORY_DOWNLOADS
-                    ), "ip_logs"
-                )
-                dir.mkdirs()
-                File(dir, "$dateStr.txt").appendText("$timeStr [$networkType] - $ip | $hash\n")
             } catch (e: Exception) {
-                // 실패 시 무시
+                "셀정보오류"
             }
         }
 
@@ -98,12 +111,98 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
             }
         }
 
+        fun logIpNow(context: Context) {
+            try {
+                val ip = URL("https://api.ipify.org").readText()
+                val now = System.currentTimeMillis()
+
+                if (ip == lastLogIp && now - lastLogTime < 10_000) return
+
+                lastLogTime = now
+                lastLogIp = ip
+
+                val date = Date(now)
+                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
+                val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(date)
+                val networkType = getNetworkType(context)
+                val cellInfo = getCellInfo(context)
+                val logData = "$timeStr[$networkType]$ip$cellInfo"
+                val hash = generateHash(logData)
+
+                val dir = File(
+                    android.os.Environment.getExternalStoragePublicDirectory(
+                        android.os.Environment.DIRECTORY_DOWNLOADS
+                    ), "ip_logs"
+                )
+                dir.mkdirs()
+
+                val file = File(dir, "$dateStr.txt")
+
+                // 새 파일이면 헤더 추가
+                if (!file.exists()) {
+                    file.writeText(
+                        """
+================================================================
+IP 로그 파일 - $dateStr
+================================================================
+[항목 설명]
+시간        : 기록 시각 (HH:mm:ss)
+통신망      : WiFi / 5G / LTE / 3G / 2G
+IP          : 공인 외부 IP 주소
+CellID      : 기지국 고유 ID (갑자기 바뀌면 의심)
+PCI         : 물리적 셀 ID (0~503, 불법중계기는 비정상값)
+LAC/TAC     : 위치 지역 코드 (같은 지역에서 변하면 의심)
+MNC         : 통신사 코드 (SKT:11 KT:08 LGU+:06, 변하면 의심)
+RSRP        : 신호 세기 (dBm, -80이상:양호 -100이하:불량)
+              불법중계기는 비정상적으로 강한 신호(-40~-50) 송출
+인접        : 주변 기지국 수 (갑자기 줄면 의심 - 신호 재밍)
+HASH        : 위변조 검증값
+================================================================
+[불법 중계기 의심 패턴]
+- 위치 변화 없는데 CellID/LAC 갑자기 변경
+- RSRP 신호가 갑자기 매우 강해짐 (-45dBm 이하)
+- 인접 기지국 수가 갑자기 1~2개로 줄어듦
+- MNC 값이 변경됨
+- LTE에서 2G/3G로 강제 다운그레이드
+================================================================
+
+                        """.trimIndent()
+                    )
+                }
+
+                // 파일 잠금 후 기록
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val channel = FileChannel.open(
+                        file.toPath(),
+                        StandardOpenOption.APPEND,
+                        StandardOpenOption.CREATE
+                    )
+                    val lock = channel.lock()
+                    try {
+                        channel.write(
+                            ByteBuffer.wrap(
+                                "$timeStr [$networkType] - $ip | $cellInfo | $hash\n".toByteArray()
+                            )
+                        )
+                    } finally {
+                        lock.release()
+                        channel.close()
+                    }
+                } else {
+                    file.appendText("$timeStr [$networkType] - $ip | $cellInfo | $hash\n")
+                }
+
+            } catch (e: Exception) {
+                // 무시
+            }
+        }
+
         fun logEvent(context: Context, event: String) {
             try {
                 val now = Date()
                 val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now)
                 val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(now)
-        
+
                 val dir = File(
                     android.os.Environment.getExternalStoragePublicDirectory(
                         android.os.Environment.DIRECTORY_DOWNLOADS
