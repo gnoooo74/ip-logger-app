@@ -97,5 +97,23 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
                 else -> "없음"
             }
         }
+
+        fun logEvent(context: Context, event: String) {
+            try {
+                val now = Date()
+                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now)
+                val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(now)
+        
+                val dir = File(
+                    android.os.Environment.getExternalStoragePublicDirectory(
+                        android.os.Environment.DIRECTORY_DOWNLOADS
+                    ), "ip_logs"
+                )
+                dir.mkdirs()
+                File(dir, "$dateStr.txt").appendText("$timeStr [이벤트] - $event\n")
+            } catch (e: Exception) {
+                // 무시
+            }
+        }
     }
 }
