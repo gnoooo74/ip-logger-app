@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1e1e1e"
+    android:padding="12dp">
+
+    <Button
+        android:id="@+id/btnSelectFile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📂 로그 파일 선택"
+        android:backgroundTint="#0078d4"
+        android:textColor="#ffffff"
+        android:layout_margin="8dp"/>
+
+    <TextView
+        android:id="@+id/tvFilePath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="파일을 선택하세요..."
+        android:textColor="#aaaaaa"
+        android:textSize="11sp"
+        android:padding="8dp"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:id="@+id/tvResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textColor="#ffffff"
+            android:textSize="11sp"
+            android:padding="8dp"/>
+
+    </ScrollView>
+
+</LinearLayout>
