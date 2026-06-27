@@ -52,15 +52,9 @@ class VerifyFragment : Fragment() {
             var prevCellId = ""; var prevLac = ""; var prevNeighbor = -1
 
             for (line in lines) {
-                if (line.isBlank() || line.startsWith("=") || line.startsWith("[")
-                    || line.startsWith("-") || line.startsWith("시간")
-                    || line.startsWith("통신망") || line.startsWith("IP 로그")
-                    || line.startsWith("불법") || line.startsWith("위치")
-                    || line.startsWith("LTE") || line.startsWith("HASH")
-                    || line.startsWith("RSRP") || line.startsWith("MNC")
-                    || line.startsWith("LAC") || line.startsWith("PCI")
-                    || line.startsWith("Cell") || line.startsWith("인접")) continue
-
+                if (line.isBlank()) continue
+                if (!line.contains(" - ") && !line.contains("[이벤트]") && !line.contains(" | ")) continue
+                
                 // 이벤트 줄
                 if (line.contains("[이벤트]")) {
                     appendColored(sb, "📌 $line\n", Color.parseColor("#ffcc00"))
