@@ -86,12 +86,23 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
 
         fun getCellInfo(context: Context): String {
             return try {
+                // 위치 권한 체크
+                val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context, android.Manifest.permission.ACCESS_FINE_LOCATION
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        
+                if (!hasPermission) return "위치권한없음"
+        
                 val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-                val cellInfoList = tm.allCellInfo ?: return "셀정보없음"
-
+                val cellInfoList = tm.allCellInfo
+        
+                if (cellInfoList == null) return "셀목록null"
+                if (cellInfoList.isEmpty()) return "셀목록빈값"
+        
                 val sb = StringBuilder()
                 var neighborCount = 0
-
+                var registeredFound = false
+        
                 for (cellInfo in cellInfoList) {
                     when {
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
@@ -99,27 +110,34 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
                             val id = cellInfo.cellIdentity as CellIdentityNr
                             val sig = cellInfo.cellSignalStrength as CellSignalStrengthNr
                             sb.append("CellID:${id.nci} PCI:${id.pci} TAC:${id.tac} MNC:${id.mncString} RSRP:${sig.ssRsrp}dBm")
+                            registeredFound = true
                         }
                         cellInfo is CellInfoLte && cellInfo.isRegistered -> {
                             val id = cellInfo.cellIdentity
                             val sig = cellInfo.cellSignalStrength
                             sb.append("CellID:${id.ci} PCI:${id.pci} LAC:${id.tac} MNC:${id.mncString} RSRP:${sig.rsrp}dBm")
+                            registeredFound = true
                         }
                         cellInfo is CellInfoWcdma && cellInfo.isRegistered -> {
                             val id = cellInfo.cellIdentity
                             val sig = cellInfo.cellSignalStrength
                             sb.append("CellID:${id.cid} LAC:${id.lac} MNC:${id.mncString} RSSI:${sig.dbm}dBm")
+                            registeredFound = true
                         }
                         !cellInfo.isRegistered -> neighborCount++
                     }
                 }
-
-                if (sb.isEmpty()) sb.append("셀정보없음")
+        
+                if (!registeredFound) {
+                    sb.append("등록셀없음(전체${cellInfoList.size}개)")
+                }
                 sb.append(" 인접:${neighborCount}개")
                 sb.toString()
-
+        
+            } catch (e: SecurityException) {
+                "권한오류:${e.message?.take(20)}"
             } catch (e: Exception) {
-                "셀정보오류"
+                "셀정보오류:${e.message?.take(20)}"
             }
         }
 
