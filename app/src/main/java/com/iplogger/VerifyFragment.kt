@@ -50,6 +50,7 @@ class VerifyFragment : Fragment() {
             var ok = 0; var fail = 0; var skip = 0
             val suspicious = mutableListOf<String>()
             var prevCellId = ""; var prevLac = ""; var prevNeighbor = -1
+            var zeroNeighborCount = 0  // 추가
 
             for (line in lines) {
                 if (line.isBlank()) continue
