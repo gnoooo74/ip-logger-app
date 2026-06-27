@@ -22,7 +22,7 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
             logIpNow(applicationContext)
 
             val next = OneTimeWorkRequestBuilder<IpLogWorker>()
-                .setInitialDelay(30, TimeUnit.SECONDS)
+                .setInitialDelay(20, TimeUnit.SECONDS)
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
