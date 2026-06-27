@@ -109,8 +109,16 @@ class VerifyFragment : Fragment() {
                             }
                             token.startsWith("인접:") -> {
                                 val n = token.replace("인접:", "").replace("개", "").toIntOrNull() ?: -1
+                                
+                                // 기존: 급감 감지
                                 if (prevNeighbor > 3 && n <= 1)
                                     suspicious.add("[$time] 인접 기지국 급감: ${prevNeighbor}개 → ${n}개")
+                                
+                                // 추가: 연속 0개 카운트
+                                if (n <= 0) zeroNeighborCount++ else zeroNeighborCount = 0
+                                if (zeroNeighborCount >= 3)
+                                    suspicious.add("[$time] ⚠️ 인접 기지국 연속 ${zeroNeighborCount}회 0개 - 전파재밍 의심!")
+                                
                                 prevNeighbor = n
                             }
                         }
