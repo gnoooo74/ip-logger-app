@@ -66,14 +66,17 @@ class MainActivity : AppCompatActivity() {
         if (permissions.isNotEmpty())
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 1001)
         else
-            startLogging()
+            requestBackgroundLocation()
     }
 
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001) startLogging()
+        when (requestCode) {
+            1001 -> requestBackgroundLocation()
+            1002 -> startLogging()
+        }
     }
 
     private fun startLogging() {
