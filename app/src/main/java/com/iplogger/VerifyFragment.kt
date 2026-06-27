@@ -53,9 +53,16 @@ class VerifyFragment : Fragment() {
             var zeroNeighborCount = 0  // 추가
 
             for (line in lines) {
-                if (line.isBlank()) continue
-                if (!line.contains(" - ") && !line.contains("[이벤트]") && !line.contains(" | ")) continue
-                
+                val trimmed = line.trim()
+                if (trimmed.isBlank()) continue
+            
+                // 실제 로그/이벤트 줄은 "HH:mm:ss" 시간 형식으로 시작함
+                val isLogLine = trimmed.length >= 8 &&
+                    trimmed[2] == ':' && trimmed[5] == ':' &&
+                    trimmed.substring(0, 8).all { it.isDigit() || it == ':' }
+            
+                if (!isLogLine) continue
+            
                 // 이벤트 줄
                 if (line.contains("[이벤트]")) {
                     appendColored(sb, "📌 $line\n", Color.parseColor("#ffcc00"))
