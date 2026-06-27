@@ -49,6 +49,41 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
             return hashBytes.joinToString("") { "%02x".format(it) }.take(16)
         }
 
+        fun triggerAlert(context: Context) {
+            try {
+                // 진동
+                val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE)
+                        as android.os.VibratorManager
+                    vm.defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                }
+        
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(
+                        android.os.VibrationEffect.createOneShot(
+                            500, android.os.VibrationEffect.DEFAULT_AMPLITUDE
+                        )
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(500)
+                }
+        
+                // 알림음
+                val notification = android.media.RingtoneManager.getDefaultUri(
+                    android.media.RingtoneManager.TYPE_NOTIFICATION
+                )
+                val ringtone = android.media.RingtoneManager.getRingtone(context, notification)
+                ringtone.play()
+        
+            } catch (e: Exception) {
+                // 무시
+            }
+        }
+
         fun getCellInfo(context: Context): String {
             return try {
                 val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
@@ -126,6 +161,9 @@ class IpLogWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
                 val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(date)
                 val networkType = getNetworkType(context)
                 val cellInfo = getCellInfo(context)
+                if (cellInfo.contains("인접:0개")) {
+                    triggerAlert(context)
+                }
                 val logData = "$timeStr[$networkType]$ip$cellInfo"
                 val hash = generateHash(logData)
 
