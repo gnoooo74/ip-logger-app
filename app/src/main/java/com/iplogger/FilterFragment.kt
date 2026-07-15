@@ -87,8 +87,8 @@ class FilterFragment : Fragment() {
 
         if (files.isEmpty()) {
             spinnerDate.adapter = ArrayAdapter(
-                requireContext(), android.R.layout.simple_spinner_dropdown_item, listOf("(저장된 로그 없음)")
-            )
+                requireContext(), R.layout.spinner_item_dark, listOf("(저장된 로그 없음)")
+            ).apply { setDropDownViewResource(R.layout.spinner_item_dark) }
             tvCount.text = "저장된 로그 파일이 없어요."
             adapter.update(emptyList())
             return
@@ -96,8 +96,8 @@ class FilterFragment : Fragment() {
 
         val names = files.map { it.name.removeSuffix(".txt") }
         spinnerDate.adapter = ArrayAdapter(
-            requireContext(), android.R.layout.simple_spinner_dropdown_item, names
-        )
+            requireContext(), R.layout.spinner_item_dark, names
+        ).apply { setDropDownViewResource(R.layout.spinner_item_dark) }
 
         val restoreIndex = names.indexOf(prevSelection)
         spinnerDate.setSelection(if (restoreIndex >= 0) restoreIndex else 0)
@@ -122,9 +122,15 @@ class FilterFragment : Fragment() {
         val cellIdQuery = etCellId.text.toString().trim()
         val pciQuery = etPci.text.toString().trim()
         val lacQuery = etLac.text.toString().trim()
-        // CellID는 3자리 미만이면 아직 조건으로 취급하지 않음 (hasFilter 판단에도 반영)
-        val effectiveCellIdQuery = if (cellIdQuery.length >= CELLID_MIN_DIGITS) cellIdQuery else ""
-        val hasFilter = listOf(ipQuery, effectiveCellIdQuery, pciQuery, lacQuery).any { it.isNotEmpty() }
+
+        // CellID는 비어 있거나(조건 없음) 3자리 이상이어야 함. 1~2자리는 검색 자체를 막는다.
+        if (cellIdQuery.isNotEmpty() && cellIdQuery.length < CELLID_MIN_DIGITS) {
+            tvCount.text = "빈값 또는 최소3자리 필요"
+            adapter.update(emptyList())
+            return
+        }
+
+        val hasFilter = listOf(ipQuery, cellIdQuery, pciQuery, lacQuery).any { it.isNotEmpty() }
 
         val matched = mutableListOf<String>()
 
@@ -168,12 +174,10 @@ class FilterFragment : Fragment() {
                 fun match(query: String, value: String?): Boolean =
                     query.isEmpty() || (value != null && value.contains(query, ignoreCase = true))
 
-                // CellID는 뒷자리 최소 3자리 입력 시에만 뒤에서부터 LIKE '%값' 형태로 매칭
-                // (3자리 미만 입력은 아직 검색 조건으로 취급하지 않음)
-                fun matchCellIdSuffix(query: String, value: String?): Boolean {
-                    if (query.length < CELLID_MIN_DIGITS) return true
-                    return value != null && value.endsWith(query, ignoreCase = true)
-                }
+                // CellID는 뒤에서부터 LIKE '%값' 형태로 매칭 (runFilter 앞단에서 이미
+                // 빈값 또는 3자리 이상만 통과하도록 검증했으므로 여기선 그대로 endsWith만 적용)
+                fun matchCellIdSuffix(query: String, value: String?): Boolean =
+                    query.isEmpty() || (value != null && value.endsWith(query, ignoreCase = true))
 
                 if (match(ipQuery, ip) &&
                     matchCellIdSuffix(cellIdQuery, cellId) &&
