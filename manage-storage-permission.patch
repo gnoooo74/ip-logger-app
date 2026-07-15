@@ -1,0 +1,82 @@
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 16067bd..1bd1c4f 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -13,6 +13,7 @@
+         android:maxSdkVersion="32"/>
+     <uses-permission android:name="android.permission.VIBRATE"/>
+     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
++    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+     
+     <application
+         android:label="IpLogger"
+diff --git a/app/src/main/java/com/iplogger/MainActivity.kt b/app/src/main/java/com/iplogger/MainActivity.kt
+index 237468c..59a6c55 100644
+--- a/app/src/main/java/com/iplogger/MainActivity.kt
++++ b/app/src/main/java/com/iplogger/MainActivity.kt
+@@ -6,8 +6,11 @@ import android.content.IntentFilter
+ import android.content.pm.PackageManager
+ import android.net.ConnectivityManager
+ import android.net.Network
++import android.net.Uri
+ import android.os.Build
+ import android.os.Bundle
++import android.os.Environment
++import android.provider.Settings
+ import androidx.appcompat.app.AppCompatActivity
+ import androidx.core.app.ActivityCompat
+ import androidx.core.content.ContextCompat
+@@ -77,7 +80,43 @@ class MainActivity : AppCompatActivity() {
+         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+         when (requestCode) {
+             1001 -> requestBackgroundLocation()
+-            1002 -> startLogging()
++            1002 -> requestAllFilesAccessIfNeeded()
++        }
++    }
++
++    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
++        super.onActivityResult(requestCode, resultCode, data)
++        if (requestCode == 1003) {
++            // 사용자가 설정 화면에서 허용/거부하고 돌아온 뒤 로깅 시작
++            // (거부해도 위치 기반 로그는 계속 동작하도록 앱을 막지는 않음)
++            startLogging()
++        }
++    }
++
++    /**
++     * Android 11(API 30)+ 에서는 Downloads/ip_logs 같은 공용 폴더에
++     * 앱이 만든 파일이라도 "모든 파일 관리" 특수 권한 없이는 접근이 막힐 수 있다.
++     * 일반 런타임 권한과 달리 다이얼로그가 아니라 설정 화면으로 유도해야 한다.
++     */
++    private fun requestAllFilesAccessIfNeeded() {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
++            try {
++                val intent = Intent(
++                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
++                    Uri.parse("package:$packageName")
++                )
++                startActivityForResult(intent, 1003)
++            } catch (e: Exception) {
++                try {
++                    startActivityForResult(
++                        Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION), 1003
++                    )
++                } catch (e2: Exception) {
++                    startLogging()
++                }
++            }
++        } else {
++            startLogging()
+         }
+     }
+ 
+@@ -114,7 +153,7 @@ class MainActivity : AppCompatActivity() {
+                 return
+             }
+         }
+-        startLogging()
++        requestAllFilesAccessIfNeeded()
+     }
+ 
+     override fun onDestroy() {
