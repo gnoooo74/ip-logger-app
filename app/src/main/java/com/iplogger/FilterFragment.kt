@@ -23,6 +23,10 @@ import java.io.File
  */
 class FilterFragment : Fragment() {
 
+    companion object {
+        private const val CELLID_MIN_DIGITS = 3
+    }
+
     private lateinit var spinnerDate: Spinner
     private lateinit var etIp: EditText
     private lateinit var etCellId: EditText
@@ -118,7 +122,9 @@ class FilterFragment : Fragment() {
         val cellIdQuery = etCellId.text.toString().trim()
         val pciQuery = etPci.text.toString().trim()
         val lacQuery = etLac.text.toString().trim()
-        val hasFilter = listOf(ipQuery, cellIdQuery, pciQuery, lacQuery).any { it.isNotEmpty() }
+        // CellID는 3자리 미만이면 아직 조건으로 취급하지 않음 (hasFilter 판단에도 반영)
+        val effectiveCellIdQuery = if (cellIdQuery.length >= CELLID_MIN_DIGITS) cellIdQuery else ""
+        val hasFilter = listOf(ipQuery, effectiveCellIdQuery, pciQuery, lacQuery).any { it.isNotEmpty() }
 
         val matched = mutableListOf<String>()
 
@@ -162,8 +168,15 @@ class FilterFragment : Fragment() {
                 fun match(query: String, value: String?): Boolean =
                     query.isEmpty() || (value != null && value.contains(query, ignoreCase = true))
 
+                // CellID는 뒷자리 최소 3자리 입력 시에만 뒤에서부터 LIKE '%값' 형태로 매칭
+                // (3자리 미만 입력은 아직 검색 조건으로 취급하지 않음)
+                fun matchCellIdSuffix(query: String, value: String?): Boolean {
+                    if (query.length < CELLID_MIN_DIGITS) return true
+                    return value != null && value.endsWith(query, ignoreCase = true)
+                }
+
                 if (match(ipQuery, ip) &&
-                    match(cellIdQuery, cellId) &&
+                    matchCellIdSuffix(cellIdQuery, cellId) &&
                     match(pciQuery, pci) &&
                     match(lacQuery, lac)
                 ) {

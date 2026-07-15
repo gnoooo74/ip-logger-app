@@ -35,10 +35,10 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="CellID"
+            android:hint="CellID (최소 3자리)"
             android:textColorHint="#888888"
             android:textColor="#ffffff"
-            android:inputType="text"
+            android:inputType="number"
             android:layout_marginStart="4dp"/>
 
     </LinearLayout>
