@@ -33,17 +33,19 @@ class MainActivity : AppCompatActivity() {
         val tabLayout = findViewById<TabLayout>(R.id.tabLayout)
 
         viewPager.adapter = object : FragmentStateAdapter(this) {
-            override fun getItemCount() = 2
+            override fun getItemCount() = 3
             override fun createFragment(position: Int): Fragment = when (position) {
                 0 -> LogFragment()
-                else -> VerifyFragment()
+                1 -> VerifyFragment()
+                else -> FilterFragment()
             }
         }
 
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
             tab.text = when (position) {
                 0 -> "📋 로그"
-                else -> "🔍 검증"
+                1 -> "🔍 검증"
+                else -> "🔎 필터"
             }
         }.attach()
     }
